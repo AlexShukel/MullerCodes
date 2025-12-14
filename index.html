@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="lt">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Užduotis A5: Reed-Muller (1, m) Kodas</title>
+    <link rel="stylesheet" href="./index.css" />
+  </head>
+
+  <body>
+    <div class="container">
+      <div class="card">
+        <h1>Užduotis A5: Reed-Muller (1, m)</h1>
+        <p>
+          Kūnas: F<sub>2</sub> | Kodas: RM(1, m) | Dekodavimas: FHT (Fast
+          Hadamard Transform)
+        </p>
+
+        <div class="controls">
+          <div>
+            <label for="paramM"
+              >Parametras m (Kodo ilgis n=2<sup>m</sup>)</label
+            >
+            <input type="number" id="paramM" value="4" min="2" max="10" />
+            <small id="codeParamsDisplay">n=16, k=5</small>
+          </div>
+          <div>
+            <label for="paramPe"
+              >Klaidos tikimybė p<sub>e</sub> (0.0 - 1.0)</label
+            >
+            <input
+              type="number"
+              id="paramPe"
+              value="0.05"
+              min="0"
+              max="1"
+              step="0.0001"
+            />
+          </div>
+        </div>
+      </div>
+
+      <div class="tabs">
+        <div class="tab active" onclick="switchTab('tab1')">1. Vektorius</div>
+        <div class="tab" onclick="switchTab('tab2')">2. Tekstas</div>
+        <div class="tab" onclick="switchTab('tab3')">3. Paveiksliukas</div>
+      </div>
+
+      <div id="tab1" class="tab-content active card">
+        <h3>Vektoriaus siuntimas</h3>
+        <p>Įveskite k ilgio vektorių (iš 0 ir 1).</p>
+
+        <div class="controls" style="margin-bottom: 20px">
+          <input type="text" id="vectorInput" placeholder="pvz. 10101" />
+          <button onclick="s1Encode()">Vykdyti</button>
+        </div>
+
+        <div id="scen1Results" style="display: none">
+          <div class="vector-step">
+            <h4>1. Kodavimas</h4>
+            <div>Pranešimas: <strong id="s1Original"></strong></div>
+            <div>
+              Užkoduota (c):
+              <span id="s1Encoded" style="font-family: monospace"></span>
+            </div>
+          </div>
+
+          <div class="vector-step">
+            <h4>2. Siuntimas kanalu</h4>
+            <div style="margin-bottom: 5px">Kanalo išėjimas (redaguojama):</div>
+            <input
+              type="text"
+              id="s1ReceivedInput"
+              style="font-family: monospace; letter-spacing: 2px"
+            />
+            <div style="margin-top: 5px">
+              <button onclick="s1Decode()">Dekoduoti šį vektorių</button>
+              <small>Klaidos: <span id="s1ErrorCount"></span></small>
+            </div>
+          </div>
+
+          <div class="vector-step">
+            <h4>3. Dekodavimas (FHT)</h4>
+            <div>Rezultatas: <strong id="s1Decoded"></strong></div>
+            <div id="s1Status"></div>
+          </div>
+        </div>
+      </div>
+      <div id="tab2" class="tab-content card">
+        <h3>Teksto siuntimas</h3>
+        <p>Įveskite siunčiamą tekstą.</p>
+        <textarea id="textInput" rows="3" placeholder="Įveskite tekstą čia...">
+Lorem Ipsum is simply dummy text of the printing and typesetting industry.</textarea
+        >
+        <br /><br />
+        <button onclick="runScenario2()">Siųsti tekstą</button>
+
+        <div class="comparison-container" style="margin-top: 20px">
+          <div>
+            <h4>Be kodavimo</h4>
+            <div id="textNoCode" class="output-box"></div>
+          </div>
+          <div>
+            <h4>Su RM(1, m) kodavimu</h4>
+            <div id="textWithCode" class="output-box"></div>
+          </div>
+        </div>
+      </div>
+      <div id="tab3" class="tab-content card">
+        <h3>Paveiksliuko siuntimas</h3>
+        <p>Pasirinkite BMP failą (24-bit).</p>
+        <input type="file" id="imageInput" accept=".bmp" />
+
+        <br /><br />
+        <button onclick="runScenario3()">Siųsti paveiksliuką</button>
+
+        <div class="comparison-container" style="margin-top: 20px">
+          <div>
+            <h4>Originalas</h4>
+            <div id="imgOriginalContainer"></div>
+          </div>
+          <div>
+            <h4>Be kodavimo</h4>
+            <div id="imgNoCodeContainer"></div>
+          </div>
+          <div>
+            <h4>Su RM(1, m) kodavimu</h4>
+            <div id="imgWithCodeContainer"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      function switchTab(tabId) {
+        document
+          .querySelectorAll(".tab")
+          .forEach((t) => t.classList.remove("active"));
+        document
+          .querySelectorAll(".tab-content")
+          .forEach((c) => c.classList.remove("active"));
+
+        const tabs = document.querySelectorAll(".tab");
+        if (tabId === "tab1") tabs[0].classList.add("active");
+        if (tabId === "tab2") tabs[1].classList.add("active");
+        if (tabId === "tab3") tabs[2].classList.add("active");
+
+        document.getElementById(tabId).classList.add("active");
+      }
+    </script>
+
+    <script src="./index.js"></script>
+  </body>
+</html>
