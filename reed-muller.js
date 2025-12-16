@@ -10,16 +10,18 @@ class ReedMuller {
     this.m = m;
     this.n = Math.pow(2, m);
     this.k = m + 1;
+
     this.generateMatrix();
+    this.kroneckerMatrices = this.generateKroneckerMatrices();
   }
 
   /**
    * Sugeneruoja generuojančią matricą G.
-   * Matricos dydis yra k x n (kur k = m + 1, n = 2^m).
+   * Matricos dydis yra k x n.
    *
    * Struktūra:
-   * - 0-oji eilutė susideda tik iš vienetų (v0).
-   * - Sekančios m eilučių (v1...vm) atitinka kintamuosius x1...xm tiesinėse funkcijose.
+   * - 0-oji eilutė susideda tik iš vienetų.
+   * - Sekančios m eilučių atitinka kintamuosius x1...xm.
    */
   generateMatrix() {
     this.G = [];
@@ -39,12 +41,41 @@ class ReedMuller {
   }
 
   /**
+   * Sugeneruoja Kroneckerio matricų seką, naudojamą dekodavimui.
+   *
+   * Sudaromos matricos: I_{2^(m−i)} × H × I_{2^(i−1)}
+   * Kur H yra 2x2 Hadamardo matrica.
+   */
+  generateKroneckerMatrices() {
+    let matrices = [];
+
+    const H = [
+      [1, 1],
+      [1, -1],
+    ];
+
+    for (let i = 1; i <= this.m; ++i) {
+      const size1 = Math.pow(2, this.m - i);
+      const size2 = Math.pow(2, i - 1);
+
+      const identity1 = this.createIdentityMatrix(size1);
+      const identity2 = this.createIdentityMatrix(size2);
+
+      let intermediate = this.kroneckerProduct(identity1, H);
+      let finalMatrix = this.kroneckerProduct(intermediate, identity2);
+
+      matrices.push(finalMatrix);
+    }
+
+    return matrices;
+  }
+
+  /**
    * Užkoduoja informacinį vektorių u.
    * Atliekama vektorinė-matricinė daugyba: c = u * G (moduliu 2).
    *
    * @param {number[]} u - Informacinis vektorius (ilgis k). Turi susidėti iš 0 ir 1.
    * @returns {number[]} c - Užkoduotas vektorius (ilgis n).
-   * @throws {Error} Jei įvesties vektoriaus ilgis neatitinka parametro k.
    */
   encode(u) {
     if (u.length !== this.k) {
@@ -53,7 +84,6 @@ class ReedMuller {
 
     let c = new Array(this.n).fill(0);
 
-    // Matricos daugyba c = u * G
     for (let col = 0; col < this.n; ++col) {
       let sum = 0;
       for (let row = 0; row < this.k; ++row) {
@@ -66,32 +96,35 @@ class ReedMuller {
   }
 
   /**
-   * Dekoduoja gautą vektorių naudojant Greitąją Hadamardo Transformaciją (FHT).
-   * Tai yra didžiausio tikėtinumo (Maximum Likelihood) dekodavimas.
+   * Dekoduoja vieną Reed-Muller užkoduotą vektorių.
    *
-   * @param {number[]} received - Iš kanalo gautas vektorius (ilgis n), gali turėti klaidų.
+   * @param {number[]} received - Iš kanalo gautas vektorius (ilgis n).
    * @returns {number[]} decoded - Atstatytas informacinis vektorius (ilgis k).
-   * @throws {Error} Jei gauto vektoriaus ilgis neatitinka n.
    */
   decode(received) {
     if (received.length !== this.n) {
       throw new Error("Neteisingas vektoriaus ilgis");
     }
 
-    // 1. Konversija į bipolinį signalą (0 -> 1, 1 -> -1)
-    let w = new Float32Array(this.n);
-    for (let i = 0; i < this.n; ++i) {
-      w[i] = received[i] === 0 ? 1 : -1;
+    let w = [...received];
+
+    // 1. Konversija į bipolinį signalą (0 -> -1, 1 -> 1)
+    for (let i = 0; i < w.length; ++i) {
+      if (w[i] === 0) {
+        w[i] = -1;
+      }
     }
 
-    // 2. Atliekama Greitoji Hadamardo Transformacija
-    this.fht(w);
+    // 2. Taikoma Hadamardo transformacija naudojant Kroneckerio matricas
+    for (let i = 0; i < this.m; ++i) {
+      w = this.multiplyVectorMatrix(w, this.kroneckerMatrices[i]);
+    }
 
     // 3. Ieškoma elemento su didžiausia absoliučia reikšme (koreliacija)
-    let maxVal = -Infinity;
     let maxIdx = -1;
+    let maxVal = -Infinity;
 
-    for (let i = 0; i < this.n; ++i) {
+    for (let i = 0; i < w.length; ++i) {
       let abs = Math.abs(w[i]);
       if (abs > maxVal) {
         maxVal = abs;
@@ -100,40 +133,74 @@ class ReedMuller {
     }
 
     // 4. Informacijos atstatymas pagal rastą indeksą ir reikšmės ženklą
-    let decoded = new Array(this.k).fill(0);
+    const decoded = new Array(this.k).fill(0);
 
     for (let r = 0; r < this.m; r++) {
       decoded[r + 1] = (maxIdx >> r) & 1;
     }
 
-    decoded[0] = w[maxIdx] > 0 ? 0 : 1;
+    decoded[0] = w[maxIdx] > 0 ? 1 : 0;
 
     return decoded;
   }
 
   /**
-   * Greitoji Hadamardo Transformacija (Fast Hadamard Transform).
-   * Algoritmas veikia "in-place" principu, modifikuodamas masyvą a.
-   * Sudėtingumas: O(n log n).
-   *
-   * @param {Float32Array|number[]} a - Bipolinis duomenų masyvas.
+   * Sukuria n x n dydžio vienetinę matricą.
    */
-  fht(a) {
-    let n = a.length;
-    for (let h = 1; h < n; h *= 2) {
-      for (let i = 0; i < n; i += h * 2) {
-        for (let j = i; j < i + h; ++j) {
-          let x = a[j];
-          let y = a[j + h];
-          a[j] = x + y;
-          a[j + h] = x - y;
+  createIdentityMatrix(size) {
+    let mat = [];
+    for (let i = 0; i < size; ++i) {
+      let row = new Array(size).fill(0);
+      row[i] = 1;
+      mat.push(row);
+    }
+    return mat;
+  }
+
+  /**
+   * Apskaičiuoja dviejų matricų A ir B Kroneckerio sandaugą.
+   */
+  kroneckerProduct(A, B) {
+    const rowsA = A.length;
+    const colsA = A[0].length;
+    const rowsB = B.length;
+    const colsB = B[0].length;
+
+    let result = [];
+
+    for (let i = 0; i < rowsA; ++i) {
+      for (let k = 0; k < rowsB; ++k) {
+        let row = new Array(colsA * colsB);
+        for (let j = 0; j < colsA; ++j) {
+          for (let l = 0; l < colsB; ++l) {
+            row[j * colsB + l] = A[i][j] * B[k][l];
+          }
         }
+        result.push(row);
       }
     }
+    return result;
+  }
+
+  /**
+   * Padaugina eilutės vektorių (1 x N) iš matricos (N x N).
+   */
+  multiplyVectorMatrix(vector, matrix) {
+    const len = vector.length;
+    let result = new Array(len).fill(0);
+
+    for (let j = 0; j < len; ++j) {
+      let sum = 0;
+      for (let i = 0; i < len; ++i) {
+        sum += vector[i] * matrix[i][j];
+      }
+      result[j] = sum;
+    }
+
+    return result;
   }
 }
 
-// Detect environment: Node.js vs Browser
 if (typeof module !== "undefined" && typeof module.exports !== "undefined") {
   module.exports = { ReedMuller };
 } else {

@@ -1,3 +1,4 @@
+const fs = require("fs");
 const { ReedMuller } = require("./reed-muller.js");
 
 const TRIALS = 10000;
@@ -48,10 +49,12 @@ function runExperiment() {
     rmInstances[m] = new ReedMuller(m);
   });
 
-  const results = {};
+  const experimentData = [];
+
+  const tableResults = {};
 
   PE_VALUES.forEach((pe) => {
-    results[pe] = {};
+    tableResults[pe] = {};
 
     process.stdout.write(`Simulating Pe = ${pe.toFixed(2)}: `);
 
@@ -79,14 +82,28 @@ function runExperiment() {
       }
 
       const successRate = (successCount / TRIALS) * 100;
-      results[pe][m] = successRate.toFixed(1) + "%";
-      process.stdout.write(`[m=${m}: ${results[pe][m]}] `);
+
+      tableResults[pe][m] = successRate.toFixed(1) + "%";
+
+      experimentData.push({
+        m: m,
+        n: Math.pow(2, m),
+        pe: pe,
+        successRate: successRate,
+      });
+
+      process.stdout.write(`[m=${m}: ${tableResults[pe][m]}] `);
     });
 
     console.log("");
   });
 
-  printTable(results);
+  // Export to JSON
+  const fileName = "simulation_results.json";
+  fs.writeFileSync(fileName, JSON.stringify(experimentData, null, 2));
+  console.log(`\nData successfully saved to ${fileName}`);
+
+  printTable(tableResults);
 }
 
 function printTable(results) {
@@ -107,16 +124,6 @@ function printTable(results) {
     M_VALUES.forEach((m) => {
       row += ` ${results[pe][m].padEnd(12)} |`;
     });
-    console.log(row);
-  });
-
-  console.log("\n=== LATEX BODY DATA ===");
-  PE_VALUES.forEach((pe) => {
-    let row = `${pe.toFixed(2)}`;
-    M_VALUES.forEach((m) => {
-      row += ` & ${results[pe][m].replace("%", "\\%")}`;
-    });
-    row += " \\\\ \\hline";
     console.log(row);
   });
 }
